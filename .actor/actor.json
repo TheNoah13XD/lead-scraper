@@ -1,0 +1,12 @@
+{
+	"actorSpecification": 1,
+	"name": "Lead Scraper",
+	"title": "Lead Scraper",
+	"description": "Scrape Emails from Linktr.ee pages.",
+	"version": "0.1",
+	"meta": {
+		"templateId": "ts-crawlee-playwright-chrome"
+	},
+	"input": "./input_schema.json",
+	"dockerfile": "./Dockerfile"
+}
