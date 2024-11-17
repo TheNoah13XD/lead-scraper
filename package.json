@@ -2,7 +2,7 @@
 	"name": "lead-scraper",
 	"version": "0.0.1",
 	"type": "module",
-	"description": "This is an example of an Apify actor.",
+	"description": "A scraper that crawls through link-in-bio sites and get user information such as name, email, bio and social media links.",
 	"engines": {
 		"node": ">=18.0.0"
 	},
@@ -30,6 +30,6 @@
 		"test": "echo \"Error: oops, the actor has no tests yet, sad!\" && exit 1",
 		"postinstall": "npx crawlee install-playwright-browsers"
 	},
-	"author": "It's not you it's me",
+	"author": "Seconds",
 	"license": "ISC"
 }
