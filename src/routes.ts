@@ -48,7 +48,7 @@ const combineAndFilterLinks = (socialIcons: any[], links: any[], emails: Set<str
 };
 
 const separateLinks = (combinedLinks: any[]) => {
-    const socialMediaDomains = ['instagram', 'tiktok', 'twitter', 'youtube', 'twitch', 'snapchat'];
+    const socialMediaDomains = ['instagram', 'tiktok', 'twitter', 'x.com', 'youtube', 'twitch', 'snapchat'];
     const isSocialMediaLink = (url: string) => socialMediaDomains.some(domain => url.includes(domain));
 
     const socialLinks = combinedLinks.filter(link => isSocialMediaLink(link.url));
@@ -83,7 +83,8 @@ const extractUsernames = (uniqueSocialLinks: any[], platform: string) => {
 const fetchSocialMediaData = async (platform: string, input: any) => {
     const actorMap: { [key: string]: string } = {
         instagram: "apify/instagram-profile-scraper",
-        tiktok: "clockworks/tiktok-profile-scraper"
+        tiktok: "clockworks/tiktok-profile-scraper",
+        twitter: "memo23/apify-twitter-profile-scraper",
     };
 
     const run = await client.actor(actorMap[platform]).call(input);
@@ -104,12 +105,17 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         extractUsernames(uniqueSocialLinks, 'tiktok')
     ];
 
-    const [instagramResult, tiktokResult] = await Promise.all([
+    const twitterStartUrls = uniqueOtherLinks.filter(link => link.url.includes('x.com')).map(link => link.url);
+
+    const [instagramResult, tiktokResult, twitterResult] = await Promise.all([
         instagramUsernames.length ? fetchSocialMediaData('instagram', { usernames: instagramUsernames, resultsLimit: 5 }) : [],
-        tiktokUsernames.length ? fetchSocialMediaData('tiktok', { profiles: tiktokUsernames, resultsPerPage: 2 }) : []
+        tiktokUsernames.length ? fetchSocialMediaData('tiktok', { profiles: tiktokUsernames, resultsPerPage: 2 }) : [],
+        twitterStartUrls.length ? fetchSocialMediaData('twitter', { startUrls: twitterStartUrls }) : [],
     ]);
 
-    const bioEmails = extractEmails(instagramResult.map((item: any) => item.biography).join(' ') + tiktokResult.map((item: any) => item.authorMeta.signature).join(' '));
+    const bioEmails = extractEmails(instagramResult.map((item: any) => item.biography).join(' ') + 
+                        tiktokResult.map((item: any) => item.authorMeta.signature).join(' ') +
+                        twitterResult.map((item: any) => item.author.description).join(' '));
     bioEmails.forEach(email => emails.add(email));
 
     log.info(`URL: ${request.url}, TITLE: ${pageTitle}`);
@@ -125,5 +131,6 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         otherLinks: uniqueOtherLinks,
         instagramResult,
         tiktokResult,
+        twitterResult,
     });
 });
