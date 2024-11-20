@@ -9,6 +9,7 @@ const client = new ApifyClient({
 });
 
 const extractEmails = (text: string) => {
+    if (!text) return new Set<string>();
     const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
     return new Set<string>((text.match(emailRegex) || []).map(email => email.trim()));
 }
@@ -40,7 +41,7 @@ const combineAndFilterLinks = (socialIcons: any[], links: any[], emails: Set<str
     const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
 
     return [...socialIcons, ...links].filter(link => {
-        if (emailRegex.test(link.url)) {
+        if (link.url && emailRegex.test(link.url)) {
             emails.add(link.url.replace(/^mailto:/, '').trim());
             return false;
         }
@@ -52,8 +53,8 @@ const separateLinks = (combinedLinks: any[]) => {
     const socialMediaDomains = ['instagram', 'tiktok', 'twitter', 'x.com', 'youtube', 'twitch', 'snapchat'];
     const isSocialMediaLink = (url: string) => socialMediaDomains.some(domain => url.includes(domain));
 
-    const socialLinks = combinedLinks.filter(link => isSocialMediaLink(link.url));
-    const otherLinks = combinedLinks.filter(link => !isSocialMediaLink(link.url));
+    const socialLinks = combinedLinks.filter(link => link.url && isSocialMediaLink(link.url));
+    const otherLinks = combinedLinks.filter(link => link.url && !isSocialMediaLink(link.url));
 
     const uniqueSocialLinks = Array.from(new Set(socialLinks.map(link => JSON.stringify(link)))).map(link => JSON.parse(link));
     const uniqueOtherLinks = Array.from(new Set(otherLinks.map(link => JSON.stringify(link)))).map(link => JSON.parse(link));
@@ -73,7 +74,7 @@ const extractUsernames = (uniqueSocialLinks: any[], platform: string) => {
     };
 
     return uniqueSocialLinks.reduce((usernames, link) => {
-        const username = extractUsername(link.url);
+        const username = link.url ? extractUsername(link.url) : null;
         if (username) {
             usernames.push(username);
         }
@@ -153,8 +154,10 @@ export const router = createPlaywrightRouter();
 
 router.addDefaultHandler(async ({ request, page, log }) => {
     const { pageTitle, profileName, socialIcons, links, emailsFromContent } = await extractProfileData(page);
+
     const emails: Set<string> = new Set(emailsFromContent);
     const combinedLinks = combineAndFilterLinks(socialIcons, links, emails);
+
     const { uniqueSocialLinks, uniqueOtherLinks } = separateLinks(combinedLinks);
 
     const [instagramUsernames, tiktokUsernames] = [
@@ -162,14 +165,14 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         extractUsernames(uniqueSocialLinks, 'tiktok')
     ];
 
-    const twitterUrls = uniqueSocialLinks.filter(link => link.url.includes('x.com')).map(link => link.url);
+    const twitterUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('x.com')).map(link => link.url);
     const twitterStartUrls = twitterUrls.map(url => Array(5).fill(url)).flat();
 
-    const youtubeUrls = uniqueSocialLinks.filter(link => link.url.includes('youtube')).map(link => link.url);
+    const youtubeUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('youtube')).map(link => link.url);
     const youtubeStartUrls = youtubeUrls.map(url => ({ url, method: 'GET' }));
 
-    const snapchatStartUrls = uniqueSocialLinks.filter(link => link.url.includes('snapchat')).map(link => link.url);
-    const twitchStartUrls = uniqueSocialLinks.filter(link => link.url.includes('twitch')).map(link => link.url);
+    const snapchatStartUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('snapchat')).map(link => link.url);
+    const twitchStartUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('twitch')).map(link => link.url);
 
     const [instagramResult, tiktokResult, twitterResult, youtubeResult, snapchatResult] = await Promise.all([
         instagramUsernames.length ? fetchSocialMediaData('instagram', { usernames: instagramUsernames, resultsLimit: 1 }) : [],
@@ -200,7 +203,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails((tiktokResult[0] as any).authorMeta.signature as string)),
     } : null;
 
-    const twitter = twitterResult ? {
+    const twitter = twitterResult && twitterResult.length ? {
         url: twitterResult[0].url,
         username: twitterResult[0].userName,
         displayName: twitterResult[0].name,
