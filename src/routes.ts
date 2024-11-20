@@ -85,7 +85,8 @@ const fetchSocialMediaData = async (platform: string, input: any) => {
         instagram: "apify/instagram-profile-scraper",
         tiktok: "clockworks/tiktok-profile-scraper",
         twitter: "memo23/apify-twitter-profile-scraper",
-        youtube: "streamers/youtube-scraper"
+        youtube: "streamers/youtube-scraper",
+        snapchat: "tri_angle/snapchat-scraper",
     };
 
     const run = await client.actor(actorMap[platform]).call(input);
@@ -108,18 +109,21 @@ router.addDefaultHandler(async ({ request, page, log }) => {
 
     const twitterStartUrls = uniqueOtherLinks.filter(link => link.url.includes('x.com')).map(link => link.url);
     const youtubeStartUrls = uniqueOtherLinks.filter(link => link.url.includes('youtube')).map(link => link.url);
+    const snapchatStartUrls = uniqueOtherLinks.filter(link => link.url.includes('snapchat')).map(link => link.url);
 
-    const [instagramResult, tiktokResult, twitterResult, youtubeResult] = await Promise.all([
+    const [instagramResult, tiktokResult, twitterResult, youtubeResult, snapchatResult] = await Promise.all([
         instagramUsernames.length ? fetchSocialMediaData('instagram', { usernames: instagramUsernames, resultsLimit: 5 }) : [],
         tiktokUsernames.length ? fetchSocialMediaData('tiktok', { profiles: tiktokUsernames, resultsPerPage: 2 }) : [],
         twitterStartUrls.length ? fetchSocialMediaData('twitter', { startUrls: twitterStartUrls }) : [],
         youtubeStartUrls.length ? fetchSocialMediaData('youtube', { startUrls: youtubeStartUrls, maxResults: 1 }) : [],
+        snapchatStartUrls.length ? fetchSocialMediaData('snapchat', { profilesInput: snapchatStartUrls }) : [],
     ]);
 
     const bioEmails = extractEmails(instagramResult.map((item: any) => item.biography).join(' ') + 
                         tiktokResult.map((item: any) => item.authorMeta.signature).join(' ') +
                         twitterResult.map((item: any) => item.author.description).join(' ') + 
-                        youtubeResult.map((item: any) => item.channelDescription).join(' '));
+                        youtubeResult.map((item: any) => item.channelDescription).join(' ') +
+                        snapchatResult.map((item: any) => item.profileDescription).join(' '));
     bioEmails.forEach(email => emails.add(email));
 
     log.info(`URL: ${request.url}, TITLE: ${pageTitle}`);
@@ -136,5 +140,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         instagramResult,
         tiktokResult,
         twitterResult,
+        youtubeResult,
+        snapchatResult,
     });
 });
