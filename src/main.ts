@@ -20,6 +20,8 @@ const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxRequestsPerCrawl,
     requestHandler: router,
+    requestHandlerTimeoutSecs: 400,
+    maxRequestRetries: 5,
 });
 
 await crawler.run(startUrls);

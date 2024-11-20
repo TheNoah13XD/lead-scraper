@@ -165,7 +165,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         extractUsernames(uniqueSocialLinks, 'tiktok')
     ];
 
-    const twitterUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('x.com')).map(link => link.url);
+    const twitterUrls = uniqueSocialLinks.filter(link => link.url && (link.url.includes('x.com') || link.url.includes('twitter.com'))).map(link => link.url);
     const twitterStartUrls = twitterUrls.map(url => Array(5).fill(url)).flat();
 
     const youtubeUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('youtube')).map(link => link.url);
