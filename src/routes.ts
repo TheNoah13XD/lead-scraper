@@ -38,6 +38,8 @@ const extractProfileData = async (page: any) => {
 };
 
 const combineAndFilterLinks = (socialIcons: any[], links: any[], emails: Set<string>) => {
+    const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+
     return [...socialIcons, ...links].filter(link => {
         if (emailRegex.test(link.url)) {
             emails.add(link.url.replace(/^mailto:/, '').trim());
