@@ -132,6 +132,11 @@ const fetchTwitchData = async (username: string) => {
     }
 
     const data = await profileResponse.json();
+
+    if (!data.data || data.data.length === 0) {
+        throw new Error(`No data found for Twitch user ${username}`);
+    }
+
     const broadcaster_id = data.data[0].id;
 
     const followersUrl = `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${broadcaster_id}`;
