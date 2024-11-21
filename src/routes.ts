@@ -8,6 +8,9 @@ const client = new ApifyClient({
     token: process.env.APIFY_TOKEN,
 });
 
+const twitchClientId = process.env.TWITCH_CLIENT_ID;
+const twitchClientSecret = process.env.TWITCH_CLIENT_SECRET;
+
 const extractEmails = (text: string) => {
     if (!text) return new Set<string>();
     const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
@@ -115,49 +118,35 @@ const fetchSocialMediaData = async (platform: string, input: any) => {
     }
 };
 
-const fetchTwitchData = async (page: any) => {
-    return await page.evaluate(() => {
-        const usernameElement = document.querySelector('h1.tw-title') as HTMLElement;
-        const username = usernameElement?.innerText.trim() || 'Unknown';
+const fetchTwitchData = async (username: string) => {
+    const headers = {
+        'Client-Id': twitchClientId || '',
+        'Authorization': `Bearer ${twitchClientSecret || ''}`
+    };
 
-        const followerCountElement = document.querySelector('span.fxviYd') as HTMLElement;
-        const followerCount = followerCountElement?.innerText.trim() || 'Unknown';
+    const profileUrl = `https://api.twitch.tv/helix/users?login=${username}`;
+    const profileResponse = await fetch(profileUrl, { method: 'GET', headers });
 
-        const bioElement = document.querySelector('p.ifSdA-D') as HTMLElement;
-        const bio = bioElement?.innerText.trim() || 'Unknown';
+    if (!profileResponse.ok) {
+        throw new Error(`Failed to fetch data for Twitch user ${username}`);
+    }
 
-        const socialLinks = Array.from(
-            document.querySelectorAll('div.social-media-link')
-        ).map(link => {
-            const titleElement = link.querySelector('p.CoreText-sc-1txzju1-0') as HTMLElement;
-            const title = titleElement?.innerText.trim() || 'Unknown';
-        
-            const anchor = link.querySelector('a') as HTMLAnchorElement;
-            const url = anchor?.getAttribute('href') || 'Unknown';
-        
-            return { title, url };
-        });
+    const data = await profileResponse.json();
+    const broadcaster_id = data.data[0].id;
 
-        const channelPanel = Array.from(
-            document.querySelectorAll('div[data-test-selector="channel_panel_test_selector"]')
-        ).map(panel => {
-            const titleElement = panel.querySelector('[data-test-selector="title_test_selector"]') as HTMLElement;
-            const title = titleElement?.innerText.trim() || 'Unknown';
-    
-            const linkElement = panel.querySelector('a[data-test-selector="link_url_test_selector"]') as HTMLAnchorElement;
-            const href = linkElement?.getAttribute('href') || 'Unknown';
-    
-            const descriptionElement = panel.querySelector('[data-test-selector="description_test_selector"] p') as HTMLElement;
-            const description = descriptionElement?.innerText.trim() || 'No description';
-    
-            const imageElement = panel.querySelector('img[data-test-selector="image_test_selector"]') as HTMLImageElement;
-            const imageSrc = imageElement?.getAttribute('src') || 'No image';
-    
-            return { title, href, description, imageSrc };
-        });
+    const followersUrl = `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${broadcaster_id}`;
+    const [followersResponse] = await Promise.all([
+        fetch(followersUrl, { method: 'GET', headers })
+    ]);
 
-        return { username, followerCount, bio, socialLinks, channelPanel };
-    });
+    if (!followersResponse.ok) {
+        throw new Error(`Failed to fetch data for Twitch user ${username}`);
+    }
+
+    const followersData = await followersResponse.json();
+    const followerCount = followersData.total;
+
+    return { login: username, bio: data.data[0].description, followerCount };
 };
 
 const expandYouTubeShortLink = async (shortUrl: string) => {
@@ -175,9 +164,10 @@ router.addDefaultHandler(async ({ request, page, log }) => {
 
     const { uniqueSocialLinks, uniqueOtherLinks } = separateLinks(combinedLinks);
 
-    const [instagramUsernames, tiktokUsernames] = [
+    const [instagramUsernames, tiktokUsernames, twitchUsernames] = [
         extractUsernames(uniqueSocialLinks, 'instagram'),
-        extractUsernames(uniqueSocialLinks, 'tiktok')
+        extractUsernames(uniqueSocialLinks, 'tiktok'),
+        extractUsernames(uniqueSocialLinks, 'twitch')
     ];
 
     const twitterUrls = uniqueSocialLinks.filter(link => link.url && (link.url.includes('x.com') || link.url.includes('twitter.com'))).map(link => link.url);
@@ -198,7 +188,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         snapchatStartUrls.length ? fetchSocialMediaData('snapchat', { profilesInput: snapchatStartUrls }) : [],
     ]);
 
-    const twitchResult = twitchStartUrls.length ? await page.goto(twitchStartUrls[0], { timeout: 60000, waitUntil: 'load' }) && await fetchTwitchData(page) : null;
+    const twitchResult = twitchUsernames.length ? await fetchTwitchData(twitchUsernames[0]) : null;
 
     const instagram = instagramResult.length ? {
         url: instagramResult[0].url,
@@ -244,11 +234,9 @@ router.addDefaultHandler(async ({ request, page, log }) => {
 
     const twitch = twitchResult ? {
         url: twitchStartUrls[0],
-        username: twitchResult.username,
+        username: twitchResult.login,
         followerCount: twitchResult.followerCount,
         bio: sanitizeText(twitchResult.bio),
-        linkedSites: twitchResult.socialLinks,
-        chanelPanels: twitchResult.channelPanel,
         emailsFound: Array.from(extractEmails(twitchResult.bio as string)),
     } : null;
 
