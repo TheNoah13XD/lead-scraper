@@ -23,6 +23,7 @@ const crawler = new PlaywrightCrawler({
     requestHandlerTimeoutSecs: 400,
     maxRequestRetries: 5,
     headless: true,
+    minConcurrency: 3,
 });
 
 await crawler.run(startUrls);

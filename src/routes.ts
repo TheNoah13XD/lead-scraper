@@ -50,8 +50,8 @@ const combineAndFilterLinks = (socialIcons: any[], links: any[], emails: Set<str
 };
 
 const separateLinks = (combinedLinks: any[]) => {
-    const socialMediaDomains = ['instagram', 'tiktok', 'twitter', 'x.com', 'youtube', 'twitch', 'snapchat'];
-    const isSocialMediaLink = (url: string) => socialMediaDomains.some(domain => url.includes(domain));
+    const socialMediaDomains = ['instagram', 'tiktok', 'twitter', 'x.com', 'youtube', 'youtu.be', 'twitch', 'snapchat'];
+    const isSocialMediaLink = (url: string) => socialMediaDomains.some(domain => url.includes(domain) || url.includes(`www.${domain}`));
 
     const socialLinks = combinedLinks.filter(link => link.url && isSocialMediaLink(link.url));
     const otherLinks = combinedLinks.filter(link => link.url && !isSocialMediaLink(link.url));
@@ -65,7 +65,11 @@ const separateLinks = (combinedLinks: any[]) => {
 const extractUsernames = (uniqueSocialLinks: any[], platform: string) => {
     const regexMap: { [key: string]: RegExp } = {
         instagram: /instagram\.com\/([^/?]+)/,
-        tiktok: /tiktok\.com\/@([^/?]+)/
+        tiktok: /tiktok\.com\/@([^/?]+)/,
+        twitter: /twitter\.com\/([^/?]+)/,
+        youtube: /youtube\.com\/([^/?]+)/,
+        twitch: /twitch\.tv\/([^/?]+)/,
+        snapchat: /snapchat\.com\/add\/([^/?]+)/
     };
 
     const extractUsername = (url: string) => {
@@ -81,6 +85,12 @@ const extractUsernames = (uniqueSocialLinks: any[], platform: string) => {
         return usernames;
     }, [] as string[]);
 };
+
+const sanitizeText = (text: string | null | undefined): string => {
+    if (!text) return '';
+    return text.replace(/\n/g, ' ');
+};
+
 
 const fetchSocialMediaData = async (platform: string, input: any) => {
     const actorMap: { [key: string]: string } = {
@@ -150,6 +160,11 @@ const fetchTwitchData = async (page: any) => {
     });
 };
 
+const expandYouTubeShortLink = async (shortUrl: string) => {
+    const response = await fetch(shortUrl, { redirect: 'follow' });
+    return response.url;
+};
+
 export const router = createPlaywrightRouter();
 
 router.addDefaultHandler(async ({ request, page, log }) => {
@@ -168,8 +183,9 @@ router.addDefaultHandler(async ({ request, page, log }) => {
     const twitterUrls = uniqueSocialLinks.filter(link => link.url && (link.url.includes('x.com') || link.url.includes('twitter.com'))).map(link => link.url);
     const twitterStartUrls = twitterUrls.map(url => Array(5).fill(url)).flat();
 
-    const youtubeUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('youtube')).map(link => link.url);
-    const youtubeStartUrls = youtubeUrls.map(url => ({ url, method: 'GET' }));
+    const youtubeUrls = uniqueSocialLinks.filter(link => link.url && (link.url.includes('youtube') || link.url.includes('youtu.be'))).map(link => link.url);
+    const expandedYouTubeUrls = await Promise.all(youtubeUrls.map(url => url.includes('youtu.be') ? expandYouTubeShortLink(url) : url));
+    const youtubeStartUrls = expandedYouTubeUrls.map(url => ({ url, method: 'GET' }));
 
     const snapchatStartUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('snapchat')).map(link => link.url);
     const twitchStartUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('twitch')).map(link => link.url);
@@ -182,14 +198,14 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         snapchatStartUrls.length ? fetchSocialMediaData('snapchat', { profilesInput: snapchatStartUrls }) : [],
     ]);
 
-    const twitchResult = twitchStartUrls.length ? await page.goto(twitchStartUrls[0], { timeout: 60000, waitUntil: 'networkidle' }) && await fetchTwitchData(page) : null;
+    const twitchResult = twitchStartUrls.length ? await page.goto(twitchStartUrls[0], { timeout: 60000, waitUntil: 'load' }) && await fetchTwitchData(page) : null;
 
     const instagram = instagramResult.length ? {
         url: instagramResult[0].url,
         username: instagramResult[0].username,
         displayName: instagramResult[0].fullName,
         followerCount: instagramResult[0].followersCount,
-        bio: instagramResult[0].biography,
+        bio: sanitizeText(instagramResult[0].biography as string),
         emailsFound: Array.from(extractEmails(instagramResult[0].biography as string)),
     } : null;
 
@@ -199,7 +215,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         displayName: (tiktokResult[0] as any).authorMeta.nickName,
         followerCount: (tiktokResult[0] as any).authorMeta.fans,
         likeCount: (tiktokResult[0] as any).authorMeta.heart,
-        bio: (tiktokResult[0] as any).authorMeta.signature,
+        bio: sanitizeText((tiktokResult[0] as any).authorMeta.signature),
         emailsFound: Array.from(extractEmails((tiktokResult[0] as any).authorMeta.signature as string)),
     } : null;
 
@@ -208,7 +224,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         username: twitterResult[0].userName,
         displayName: twitterResult[0].name,
         followerCount: twitterResult[0].followers,
-        bio: twitterResult[0].description,
+        bio: sanitizeText(twitterResult[0].description as string),
         location: twitterResult[0].location,
         linkedSite: (twitterResult[0].entities as any).url?.urls[0].expanded_url,
         emailsFound: Array.from(extractEmails(twitterResult[0].description as string)),
@@ -219,7 +235,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         channelName: youtubeResult[0].channelName,
         userName: youtubeResult[0].channelId,
         subscriberCount: youtubeResult[0].numberOfSubscribers,
-        channelDescription: youtubeResult[0].channelDescription,
+        channelDescription: sanitizeText(youtubeResult[0].channelDescription as string),
         linkedSites: youtubeResult[0].channelDescriptionLinks,
         viewCount: youtubeResult[0].viewCount,
         country: youtubeResult[0].channelLocation,
@@ -230,7 +246,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         url: twitchStartUrls[0],
         username: twitchResult.username,
         followerCount: twitchResult.followerCount,
-        bio: twitchResult.bio,
+        bio: sanitizeText(twitchResult.bio),
         linkedSites: twitchResult.socialLinks,
         chanelPanels: twitchResult.channelPanel,
         emailsFound: Array.from(extractEmails(twitchResult.bio as string)),
@@ -239,7 +255,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
     const snapchat = snapchatResult.length ? {
         url: snapchatResult[0].profileUrl,
         username: snapchatResult[0].username1,
-        bio: snapchatResult[0].profileDescription,
+        bio: sanitizeText(snapchatResult[0].profileDescription as string),
     } : null;
 
     log.info(`URL: ${request.url}, TITLE: ${pageTitle}`);
