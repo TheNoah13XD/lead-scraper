@@ -182,7 +182,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         snapchatStartUrls.length ? fetchSocialMediaData('snapchat', { profilesInput: snapchatStartUrls }) : [],
     ]);
 
-    const twitchResult = twitchStartUrls.length ? await page.goto(twitchStartUrls[0]) && await fetchTwitchData(page) : null;
+    const twitchResult = twitchStartUrls.length ? await page.goto(twitchStartUrls[0], { timeout: 60000, waitUntil: 'networkidle' }) && await fetchTwitchData(page) : null;
 
     const instagram = instagramResult.length ? {
         url: instagramResult[0].url,
