@@ -225,18 +225,6 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails(twitterResult[0].description as string)),
     } : null;
 
-    const youtube = youtubeResult.length ? {
-        url: youtubeResult[0].url,
-        channelName: youtubeResult[0].channelName,
-        userName: youtubeResult[0].channelId,
-        subscriberCount: youtubeResult[0].numberOfSubscribers,
-        channelDescription: sanitizeText(youtubeResult[0].channelDescription as string),
-        linkedSites: youtubeResult[0].channelDescriptionLinks,
-        viewCount: youtubeResult[0].viewCount,
-        country: youtubeResult[0].channelLocation,
-        emailsFound: Array.from(extractEmails(youtubeResult[0].channelDescription as string)),
-    } : null;
-
     const twitch = twitchResult ? {
         url: twitchStartUrls[0],
         username: twitchResult.login,
@@ -249,6 +237,19 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         url: snapchatResult[0].profileUrl,
         username: snapchatResult[0].username1,
         bio: sanitizeText(snapchatResult[0].profileDescription as string),
+        emailsFound: Array.from(extractEmails(snapchatResult[0].profileDescription as string))
+    } : null;
+
+    const youtube = youtubeResult.length ? {
+        url: youtubeResult[0].url,
+        channelName: youtubeResult[0].channelName,
+        channelId: youtubeResult[0].channelId,
+        subscriberCount: youtubeResult[0].numberOfSubscribers,
+        channelDescription: sanitizeText(youtubeResult[0].channelDescription as string),
+        viewCount: youtubeResult[0].viewCount,
+        country: youtubeResult[0].channelLocation,
+        linkedSites: youtubeResult[0].channelDescriptionLinks,
+        emailsFound: Array.from(extractEmails(youtubeResult[0].channelDescription as string)),
     } : null;
 
     log.info(`URL: ${request.url}, TITLE: ${pageTitle}`);
@@ -256,18 +257,51 @@ router.addDefaultHandler(async ({ request, page, log }) => {
     log.info(`Final email count: ${emails.size}`);
 
     await Dataset.pushData({
-        url: request.loadedUrl,
-        pageTitle,
-        profileName,
-        emails: Array.from(emails),
-        socials: uniqueSocialLinks,
-        otherLinks: uniqueOtherLinks,
-        instagram,
-        tiktok,
-        twitter,
-        youtube,
-        hasTwitch: twitchResult ? true : false,
-        twitch,
-        snapchat,
+        "01_linktree_url": request.loadedUrl,
+        "02_linktree_profilename": profileName,
+        "03_linktree_pagetitle": pageTitle,
+        "04_emailfound_linktree": Array.from(emails),
+        "05_emailfound_insta": instagram ? instagram.emailsFound : [],
+        "06_emailfound_tiktok": tiktok ? tiktok.emailsFound : [],
+        "07_emailfound_x": twitter ? twitter.emailsFound : [],
+        "08_emailfound_youtube": youtube ? youtube.emailsFound : [],
+        "09_emailfound_twitch": twitch ? twitch.emailsFound : [],
+        "10_emailfound_snap": snapchat ? snapchat.emailsFound : [],
+        "11_hasTwitch": twitchResult ? true : false,
+        "12_twitch_url": twitch ? twitch.url : null,
+        "13_twitch_username": twitch ? twitch.username : null,
+        "14_twitch_followercount": twitch ? twitch.followerCount : null,
+        "15_twitch_bio": twitch ? twitch.bio : null,
+        "16_insta_url": instagram ? instagram.url : null,
+        "17_insta_username": instagram ? instagram.username : null,
+        "18_insta_displayname": instagram ? instagram.displayName : null,
+        "19_insta_followercount": instagram ? instagram.followerCount : null,
+        "20_insta_bio": instagram ? instagram.bio : null,
+        "21_tiktok_url": tiktok ? tiktok.url : null,
+        "22_tiktok_username": tiktok ? tiktok.username : null,
+        "23_tiktok_displayname": tiktok ? tiktok.displayName : null,
+        "24_tiktok_followercount": tiktok ? tiktok.followerCount : null,
+        "25_tiktok_likecount": tiktok ? tiktok.likeCount : null,
+        "26_tiktok_bio": tiktok ? tiktok.bio : null,
+        "27_x_url": twitter ? twitter.url : null,
+        "28_x_username": twitter ? twitter.username : null,
+        "29_x_displayname": twitter ? twitter.displayName : null,
+        "30_x_followercount": twitter ? twitter.followerCount : null,
+        "31_x_bio": twitter ? twitter.bio : null,
+        "32_x_location": twitter ? twitter.location : null,
+        "33_x_linkedSite": twitter ? twitter.linkedSite : null,
+        "34_snap_url": snapchat ? snapchat.url : null,
+        "35_snap_username": snapchat ? snapchat.username : null,
+        "36_snap_bio": snapchat ? snapchat.bio : null,
+        "37_youtube_url": youtube ? youtube.url : null,
+        "38_youtube_channelname": youtube ? youtube.channelName : null,
+        "39_youtube_channelid": youtube ? youtube.channelId : null,
+        "40_youtube_subscribercount": youtube ? youtube.subscriberCount : null,
+        "41_youtube_channeldescription": youtube ? youtube.channelDescription : null,
+        "42_youtube_viewcount": youtube ? youtube.viewCount : null,
+        "43_youtube_country": youtube ? youtube.country : null,
+        "44_youtube_linkedSites": youtube ? youtube.linkedSites : null,
+        "45_socialLinks": uniqueSocialLinks,
+        "46_otherLinks": uniqueOtherLinks,
     });
 });
