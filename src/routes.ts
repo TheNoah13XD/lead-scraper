@@ -266,6 +266,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         tiktok,
         twitter,
         youtube,
+        hasTwitch: twitchResult ? true : false,
         twitch,
         snapchat,
     });
