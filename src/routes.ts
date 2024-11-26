@@ -81,7 +81,7 @@ const extractUsernames = (uniqueSocialLinks: any[], platform: string) => {
     };
 
     return uniqueSocialLinks.reduce((usernames, link) => {
-        const username = link.url ? extractUsername(link.url) : null;
+        const username = link && link.url ? extractUsername(link.url) : null;
         if (username) {
             usernames.push(username);
         }
@@ -178,12 +178,12 @@ router.addDefaultHandler(async ({ request, page, log }) => {
     const twitterUrls = uniqueSocialLinks.filter(link => link && link.url && (link.url.includes('x.com') || link.url.includes('twitter.com'))).map(link => link.url);
     const twitterStartUrls = twitterUrls.map(url => Array(5).fill(url)).flat();
 
-    const youtubeUrls = uniqueSocialLinks.filter(link => link.url && (link.url.includes('youtube') || link.url.includes('youtu.be'))).map(link => link.url);
+    const youtubeUrls = uniqueSocialLinks.filter(link => link && link.url && (link.url.includes('youtube') || link.url.includes('youtu.be'))).map(link => link.url);
     const expandedYouTubeUrls = await Promise.all(youtubeUrls.map(url => url.includes('youtu.be') ? expandYouTubeShortLink(url) : url));
     const youtubeStartUrls = expandedYouTubeUrls.map(url => ({ url, method: 'GET' }));
 
     const snapchatStartUrls = uniqueSocialLinks.filter(link => link && link.url && link.url.includes('snapchat')).map(link => link.url);
-    const twitchStartUrls = uniqueSocialLinks.filter(link => link.url && link.url.includes('twitch')).map(link => link.url);
+    const twitchStartUrls = uniqueSocialLinks.filter(link => link && link.url && link.url.includes('twitch')).map(link => link.url);
 
     const [instagramResult, tiktokResult, twitterResult, youtubeResult, snapchatResult] = await Promise.all([
         instagramUsernames.length ? fetchSocialMediaData('instagram', { usernames: instagramUsernames, resultsLimit: 1 }) : [],
