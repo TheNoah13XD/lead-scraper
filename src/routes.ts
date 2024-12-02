@@ -8,9 +8,6 @@ const client = new ApifyClient({
     token: process.env.APIFY_TOKEN,
 });
 
-const twitchClientId = process.env.TWITCH_CLIENT_ID;
-const twitchClientSecret = process.env.TWITCH_CLIENT_SECRET;
-
 const extractEmails = (text: string) => {
     if (!text) return new Set<string>();
     const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
