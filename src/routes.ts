@@ -118,41 +118,41 @@ const fetchSocialMediaData = async (platform: string, input: any) => {
     }
 };
 
-const fetchTwitchData = async (username: string) => {
-    const headers = {
-        'Client-Id': twitchClientId || '',
-        'Authorization': `Bearer ${twitchClientSecret || ''}`
-    };
+// const fetchTwitchData = async (username: string) => {
+//     const headers = {
+//         'Client-Id': twitchClientId || '',
+//         'Authorization': `Bearer ${twitchClientSecret || ''}`
+//     };
 
-    const profileUrl = `https://api.twitch.tv/helix/users?login=${username}`;
-    const profileResponse = await fetch(profileUrl, { method: 'GET', headers });
+//     const profileUrl = `https://api.twitch.tv/helix/users?login=${username}`;
+//     const profileResponse = await fetch(profileUrl, { method: 'GET', headers });
 
-    if (!profileResponse.ok) {
-        throw new Error(`Failed to fetch data for Twitch user ${username}`);
-    }
+//     if (!profileResponse.ok) {
+//         throw new Error(`Failed to fetch data for Twitch user ${username}`);
+//     }
 
-    const data = await profileResponse.json();
+//     const data = await profileResponse.json();
 
-    if (!data.data || data.data.length === 0) {
-        throw new Error(`No data found for Twitch user ${username}`);
-    }
+//     if (!data.data || data.data.length === 0) {
+//         throw new Error(`No data found for Twitch user ${username}`);
+//     }
 
-    const broadcaster_id = data.data[0].id;
+//     const broadcaster_id = data.data[0].id;
 
-    const followersUrl = `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${broadcaster_id}`;
-    const [followersResponse] = await Promise.all([
-        fetch(followersUrl, { method: 'GET', headers })
-    ]);
+//     const followersUrl = `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${broadcaster_id}`;
+//     const [followersResponse] = await Promise.all([
+//         fetch(followersUrl, { method: 'GET', headers })
+//     ]);
 
-    if (!followersResponse.ok) {
-        throw new Error(`Failed to fetch data for Twitch user ${username}`);
-    }
+//     if (!followersResponse.ok) {
+//         throw new Error(`Failed to fetch data for Twitch user ${username}`);
+//     }
 
-    const followersData = await followersResponse.json();
-    const followerCount = followersData.total;
+//     const followersData = await followersResponse.json();
+//     const followerCount = followersData.total;
 
-    return { login: username, bio: data.data[0].description, followerCount };
-};
+//     return { login: username, bio: data.data[0].description, followerCount };
+// };
 
 const expandYouTubeShortLink = async (shortUrl: string) => {
     const response = await fetch(shortUrl, { redirect: 'follow' });
@@ -167,12 +167,11 @@ router.addDefaultHandler(async ({ request, page, log }) => {
     const emails: Set<string> = new Set(emailsFromContent);
     const combinedLinks = combineAndFilterLinks(socialIcons, links, emails);
 
-    const { uniqueSocialLinks, uniqueOtherLinks } = separateLinks(combinedLinks);
+    const { uniqueSocialLinks } = separateLinks(combinedLinks);
 
-    const [instagramUsernames, tiktokUsernames, twitchUsernames] = [
+    const [instagramUsernames, tiktokUsernames] = [
         extractUsernames(uniqueSocialLinks, 'instagram'),
-        extractUsernames(uniqueSocialLinks, 'tiktok'),
-        extractUsernames(uniqueSocialLinks, 'twitch')
+        extractUsernames(uniqueSocialLinks, 'tiktok')
     ];
 
     const twitterUrls = uniqueSocialLinks.filter(link => link && link.url && (link.url.includes('x.com') || link.url.includes('twitter.com'))).map(link => link.url);
@@ -183,7 +182,6 @@ router.addDefaultHandler(async ({ request, page, log }) => {
     const youtubeStartUrls = expandedYouTubeUrls.map(url => ({ url, method: 'GET' }));
 
     const snapchatStartUrls = uniqueSocialLinks.filter(link => link && link.url && link.url.includes('snapchat')).map(link => link.url);
-    const twitchStartUrls = uniqueSocialLinks.filter(link => link && link.url && link.url.includes('twitch')).map(link => link.url);
 
     const [instagramResult, tiktokResult, twitterResult, youtubeResult, snapchatResult] = await Promise.all([
         instagramUsernames.length ? fetchSocialMediaData('instagram', { usernames: instagramUsernames, resultsLimit: 1 }) : [],
@@ -192,8 +190,6 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         youtubeStartUrls.length ? fetchSocialMediaData('youtube', { startUrls: youtubeStartUrls, maxResults: 1, maxResultStreams: 0, maxResultsShorts: 0 }) : [],
         snapchatStartUrls.length ? fetchSocialMediaData('snapchat', { profilesInput: snapchatStartUrls }) : [],
     ]);
-
-    const twitchResult = twitchUsernames.length ? await fetchTwitchData(twitchUsernames[0]) : null;
 
     const instagram = instagramResult.length ? {
         url: instagramResult[0].url,
@@ -225,14 +221,6 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails(twitterResult[0].description as string)),
     } : null;
 
-    const twitch = twitchResult ? {
-        url: twitchStartUrls[0],
-        username: twitchResult.login,
-        followerCount: twitchResult.followerCount,
-        bio: sanitizeText(twitchResult.bio),
-        emailsFound: Array.from(extractEmails(twitchResult.bio as string)),
-    } : null;
-
     const snapchat = snapchatResult.length ? {
         url: snapchatResult[0].profileUrl,
         username: snapchatResult[0].username1,
@@ -248,61 +236,68 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         channelDescription: sanitizeText(youtubeResult[0].channelDescription as string),
         viewCount: youtubeResult[0].viewCount,
         country: youtubeResult[0].channelLocation,
-        linkedSites: youtubeResult[0].channelDescriptionLinks,
         emailsFound: Array.from(extractEmails(youtubeResult[0].channelDescription as string)),
     } : null;
+
+    const allEmails = Array.from(new Set(emailsFromContent).add(instagram?.emailsFound).add(tiktok?.emailsFound).add(twitter?.emailsFound).add(snapchat?.emailsFound).add(youtube?.emailsFound))
+    const followersCount = instagram?.followerCount + tiktok?.followerCount + twitter?.followerCount + youtube?.subscriberCount
+
+    // get the platform with highest follower count
+    const platforms = [
+        { name: 'Instagram', count: instagram?.followerCount || 0 },
+        { name: 'TikTok', count: tiktok?.followerCount || 0 },
+        { name: 'Twitter', count: twitter?.followerCount || 0 },
+        { name: 'YouTube', count: youtube?.subscriberCount || 0 },
+    ];
+
+    const topPlatform = platforms.reduce(
+        (max, current) => (current.count > max.count ? current : max),
+        { name: '', count: 0 }
+    );
 
     log.info(`URL: ${request.url}, TITLE: ${pageTitle}`);
     log.info(`Profile Name: ${profileName}`);
     log.info(`Final email count: ${emails.size}`);
 
     await Dataset.pushData({
-        "01_linktree_url": request.loadedUrl,
-        "02_linktree_profilename": profileName,
-        "03_linktree_pagetitle": pageTitle,
-        "04_hasEmails": emails.size + (instagram ? instagram.emailsFound.length : 0) + (tiktok ? tiktok.emailsFound.length : 0) + (twitter ? twitter.emailsFound.length : 0) + (twitch ? twitch.emailsFound.length : 0) + (snapchat ? snapchat.emailsFound.length : 0) + (youtube ? youtube.emailsFound.length : 0) > 0 ? true : false,
-        "05_emailfound_linktree": Array.from(emails),
-        "06_emailfound_insta": instagram ? instagram.emailsFound : [],
-        "07_emailfound_tiktok": tiktok ? tiktok.emailsFound : [],
-        "08_emailfound_x": twitter ? twitter.emailsFound : [],
+        "01_emailfound_linktree": Array.from(emails),
+        "02_insta_url": instagram ? instagram.url : null,
+        "03_emailfound_insta": instagram ? instagram.emailsFound : [],
+        "04_tiktok_url": tiktok ? tiktok.url : null,
+        "05_emailfound_tiktok": tiktok ? tiktok.emailsFound : [],
+        "06_x_url": twitter ? twitter.url : null,
+        "07_emailfound_x": twitter ? twitter.emailsFound : [],
+        "08_youtube_url": youtube ? youtube.url : null,
         "09_emailfound_youtube": youtube ? youtube.emailsFound : [],
-        "10_emailfound_twitch": twitch ? twitch.emailsFound : [],
+        "10_snap_url": snapchat ? snapchat.url : null,
         "11_emailfound_snap": snapchat ? snapchat.emailsFound : [],
-        "12_hasTwitch": twitchResult ? true : false,
-        "13_twitch_url": twitch ? twitch.url : null,
-        "14_twitch_username": twitch ? twitch.username : null,
-        "15_twitch_followercount": twitch ? twitch.followerCount : null,
-        "16_twitch_bio": twitch ? twitch.bio : null,
-        "17_insta_url": instagram ? instagram.url : null,
-        "18_insta_username": instagram ? instagram.username : null,
-        "19_insta_displayname": instagram ? instagram.displayName : null,
-        "20_insta_followercount": instagram ? instagram.followerCount : null,
-        "21_insta_bio": instagram ? instagram.bio : null,
-        "22_tiktok_url": tiktok ? tiktok.url : null,
-        "23_tiktok_username": tiktok ? tiktok.username : null,
-        "24_tiktok_displayname": tiktok ? tiktok.displayName : null,
-        "25_tiktok_followercount": tiktok ? tiktok.followerCount : null,
-        "26_tiktok_likecount": tiktok ? tiktok.likeCount : null,
-        "27_tiktok_bio": tiktok ? tiktok.bio : null,
-        "28_x_url": twitter ? twitter.url : null,
-        "29_x_username": twitter ? twitter.username : null,
-        "30_x_displayname": twitter ? twitter.displayName : null,
-        "31_x_followercount": twitter ? twitter.followerCount : null,
-        "32_x_bio": twitter ? twitter.bio : null,
-        "33_x_location": twitter ? twitter.location : null,
-        "34_x_linkedSite": twitter ? twitter.linkedSite : null,
-        "35_snap_url": snapchat ? snapchat.url : null,
-        "36_snap_username": snapchat ? snapchat.username : null,
-        "37_snap_bio": snapchat ? snapchat.bio : null,
-        "38_youtube_url": youtube ? youtube.url : null,
-        "39_youtube_channelname": youtube ? youtube.channelName : null,
-        "40_youtube_channelid": youtube ? youtube.channelId : null,
-        "41_youtube_subscribercount": youtube ? youtube.subscriberCount : null,
-        "42_youtube_channeldescription": youtube ? youtube.channelDescription : null,
-        "43_youtube_viewcount": youtube ? youtube.viewCount : null,
-        "44_youtube_country": youtube ? youtube.country : null,
-        "45_youtube_linkedSites": youtube ? youtube.linkedSites : null,
-        "46_socialLinks": uniqueSocialLinks,
-        "47_otherLinks": uniqueOtherLinks,
+        "12_x_location": twitter ? twitter.location : null,
+        "13_youtube_country": youtube ? youtube.country : null,
+        "14_youtube_channelViews": youtube ? youtube.viewCount : null,
+        "15_tiktok_likeCount": tiktok ? tiktok.likeCount : null,
+        "16_tiktok_followerCount": tiktok ? tiktok.followerCount : null,
+        "17_x_followerCount": twitter ? twitter.followerCount : null,
+        "18_youtube_subscriberCount": youtube ? youtube.subscriberCount : null,
+        "19_insta_followerCount": instagram ? instagram.followerCount : null,
+        "20_linktree_pagetitle": pageTitle,
+        "21_snap_bio": snapchat ? snapchat.bio : null,
+        "22_x_bio": twitter ? twitter.bio : null,
+        "23_youtube_channelDiscription": youtube ? youtube.channelDescription : null,
+        "24_tiktok_bio": tiktok ? tiktok.bio : null,
+        "25_insta_bio": instagram ? instagram.bio : null,
+        "26_snap_username": snapchat ? snapchat.username : null,
+        "27_x_username": twitter ? twitter.username : null,
+        "28_x_displayname": twitter ? twitter.displayName : null,
+        "29_youtube_channelName": youtube ? youtube.channelName : null,
+        "30_linktree_profilename": profileName,
+        "31_tiktok_username": tiktok ? tiktok.username : null,
+        "32_tiktok_displayname": tiktok ? tiktok.displayName : null,
+        "33_insta_username": instagram ? instagram.username : null,
+        "34_insta_displayname": instagram ? instagram.displayName : null,
+        "35_estimatedFirstname": "",
+        "36_mainEmail": allEmails[0],
+        "37_mainPlatform": topPlatform,
+        "38_followerCount_sum": followersCount,
+        "39_linktree_url": request.loadedUrl,
     });
 });
