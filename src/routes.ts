@@ -236,8 +236,8 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails(youtubeResult[0].channelDescription as string)),
     } : null;
 
-    const allEmails = Array.from(new Set(emailsFromContent).add(instagram?.emailsFound).add(tiktok?.emailsFound).add(twitter?.emailsFound).add(snapchat?.emailsFound).add(youtube?.emailsFound))
-    const followersCount = instagram?.followerCount + tiktok?.followerCount + twitter?.followerCount + youtube?.subscriberCount
+    const allEmails = Array.from(new Set([...emailsFromContent, ...(instagram?.emailsFound || []), ...(tiktok?.emailsFound || []), ...(twitter?.emailsFound || []), ...(snapchat?.emailsFound || []), ...(youtube?.emailsFound || [])]));
+    const mainEmail = allEmails.filter(email => email)[0];
 
     // get the platform with highest follower count
     const platforms = [
@@ -291,10 +291,8 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         "32_tiktok_displayname": tiktok ? tiktok.displayName : null,
         "33_insta_username": instagram ? instagram.username : null,
         "34_insta_displayname": instagram ? instagram.displayName : null,
-        "35_estimatedFirstname": "",
-        "36_mainEmail": allEmails[0],
-        "37_mainPlatform": topPlatform,
-        "38_followerCount_sum": followersCount,
-        "39_linktree_url": request.loadedUrl,
+        "35_mainEmail": mainEmail,
+        "36_mainPlatform": topPlatform,
+        "37_linktree_url": request.loadedUrl,
     });
 });
