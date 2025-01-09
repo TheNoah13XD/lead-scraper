@@ -149,7 +149,7 @@ const fetchSocialMediaData = async (platform: string, input: any) => {
 //     const followerCount = followersData.total;
 
 //     return { login: username, bio: data.data[0].description, followerCount };
-// };
+// };   
 
 const expandYouTubeShortLink = async (shortUrl: string) => {
     const response = await fetch(shortUrl, { redirect: 'follow' });
@@ -188,7 +188,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         snapchatStartUrls.length ? fetchSocialMediaData('snapchat', { profilesInput: snapchatStartUrls }) : [],
     ]);
 
-    const instagram = instagramResult.length ? {
+    const instagram = instagramResult.length && instagramResult[0] ? {
         url: instagramResult[0].url,
         username: instagramResult[0].username,
         displayName: instagramResult[0].fullName,
@@ -197,7 +197,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails(instagramResult[0].biography as string)),
     } : null;
 
-    const tiktok = tiktokResult.length ? {
+    const tiktok = tiktokResult.length && tiktokResult[0] ? {
         url: (tiktokResult[0] as any).authorMeta.profileUrl,
         username: (tiktokResult[0] as any).authorMeta.name,
         displayName: (tiktokResult[0] as any).authorMeta.nickName,
@@ -207,25 +207,26 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails((tiktokResult[0] as any).authorMeta.signature as string)),
     } : null;
 
-    const twitter = twitterResult && twitterResult.length ? {
+    console.log(twitterResult);
+    
+    const twitter = twitterResult && twitterResult.length && twitterResult[0] ? {
         url: twitterResult[0].url,
         username: twitterResult[0].userName,
         displayName: twitterResult[0].name,
         followerCount: twitterResult[0].followers,
         bio: sanitizeText(twitterResult[0].description as string),
         location: twitterResult[0].location,
-        linkedSite: (twitterResult[0].entities as any).url?.urls[0].expanded_url,
         emailsFound: Array.from(extractEmails(twitterResult[0].description as string)),
     } : null;
-
-    const snapchat = snapchatResult.length ? {
+    
+    const snapchat = snapchatResult.length && snapchatResult[0] ? {
         url: snapchatResult[0].profileUrl,
         username: snapchatResult[0].username1,
         bio: sanitizeText(snapchatResult[0].profileDescription as string),
         emailsFound: Array.from(extractEmails(snapchatResult[0].profileDescription as string))
     } : null;
-
-    const youtube = youtubeResult.length ? {
+    
+    const youtube = youtubeResult.length && youtubeResult[0] ? {
         url: youtubeResult[0].url,
         channelName: youtubeResult[0].channelName,
         channelId: youtubeResult[0].channelId,
