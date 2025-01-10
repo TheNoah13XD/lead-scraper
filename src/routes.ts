@@ -188,7 +188,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         snapchatStartUrls.length ? fetchSocialMediaData('snapchat', { profilesInput: snapchatStartUrls }) : [],
     ]);
 
-    const instagram = instagramResult.length && instagramResult[0] ? {
+    const instagram = instagramResult.length ? {
         url: instagramResult[0].url,
         username: instagramResult[0].username,
         displayName: instagramResult[0].fullName,
@@ -207,9 +207,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails((tiktokResult[0] as any).authorMeta.signature as string)),
     } : null;
 
-    console.log(twitterResult);
-    
-    const twitter = twitterResult && twitterResult.length && twitterResult[0] ? {
+    const twitter = twitterResult.length ? {
         url: twitterResult[0].url,
         username: twitterResult[0].userName,
         displayName: twitterResult[0].name,
@@ -219,14 +217,14 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails(twitterResult[0].description as string)),
     } : null;
     
-    const snapchat = snapchatResult.length && snapchatResult[0] ? {
+    const snapchat = snapchatResult.length && snapchatResult[0] && snapchatResult[0].profileUrl ? {
         url: snapchatResult[0].profileUrl,
         username: snapchatResult[0].username1,
         bio: sanitizeText(snapchatResult[0].profileDescription as string),
         emailsFound: Array.from(extractEmails(snapchatResult[0].profileDescription as string))
     } : null;
     
-    const youtube = youtubeResult.length && youtubeResult[0] ? {
+    const youtube = youtubeResult.length ? {
         url: youtubeResult[0].url,
         channelName: youtubeResult[0].channelName,
         channelId: youtubeResult[0].channelId,
@@ -237,8 +235,8 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails(youtubeResult[0].channelDescription as string)),
     } : null;
 
-    const allEmails = Array.from(new Set([...emailsFromContent, ...(instagram?.emailsFound || []), ...(tiktok?.emailsFound || []), ...(twitter?.emailsFound || []), ...(snapchat?.emailsFound || []), ...(youtube?.emailsFound || [])]));
-    const mainEmail = allEmails.filter(email => email)[0];
+    const allEmails = new Set([...emails, ...(instagram?.emailsFound || []), ...(tiktok?.emailsFound || []), ...(twitter?.emailsFound || []), ...(youtube?.emailsFound || []), ...(snapchat?.emailsFound || [])]);
+    const mainEmail = allEmails.size ? Array.from(allEmails)[0] : null;
 
     // get the platform with highest follower count
     const platforms = [
