@@ -197,14 +197,14 @@ router.addDefaultHandler(async ({ request, page, log }) => {
         emailsFound: Array.from(extractEmails(instagramResult[0].biography as string)),
     } : null;
 
-    const tiktok = tiktokResult.length && tiktokResult[0] ? {
-        url: (tiktokResult[0] as any).authorMeta.profileUrl,
-        username: (tiktokResult[0] as any).authorMeta.name,
-        displayName: (tiktokResult[0] as any).authorMeta.nickName,
-        followerCount: (tiktokResult[0] as any).authorMeta.fans,
-        likeCount: (tiktokResult[0] as any).authorMeta.heart,
-        bio: sanitizeText((tiktokResult[0] as any).authorMeta.signature),
-        emailsFound: Array.from(extractEmails((tiktokResult[0] as any).authorMeta.signature as string)),
+    const tiktok = tiktokResult.length && tiktokResult[0] && tiktokResult[0].authorMeta && typeof tiktokResult[0].authorMeta === 'object' && 'profileUrl' in tiktokResult[0].authorMeta ? {
+        url: (tiktokResult[0].authorMeta as any).profileUrl || '',
+        username: (tiktokResult[0].authorMeta as any).name,
+        displayName: (tiktokResult[0].authorMeta as any).nickName,
+        followerCount: (tiktokResult[0].authorMeta as any).fans,
+        likeCount: (tiktokResult[0].authorMeta as any).heart,
+        bio: sanitizeText((tiktokResult[0].authorMeta as any).signature),
+        emailsFound: 'signature' in tiktokResult[0].authorMeta ? Array.from(extractEmails(tiktokResult[0].authorMeta.signature as string)) : [],
     } : null;
 
     const twitter = twitterResult.length ? {
@@ -253,7 +253,7 @@ router.addDefaultHandler(async ({ request, page, log }) => {
 
     log.info(`URL: ${request.url}, TITLE: ${pageTitle}`);
     log.info(`Profile Name: ${profileName}`);
-    log.info(`Final email count: ${emails.size}`);
+    log.info(`Final email count: ${allEmails.size}`);
 
     await Dataset.pushData({
         "01_emailfound_linktree": Array.from(emails),
