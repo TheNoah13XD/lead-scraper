@@ -1,17 +1,18 @@
 import { Dataset, createPlaywrightRouter } from 'crawlee';
-import { ApifyClient } from 'apify-client';
 import dotenv from 'dotenv';
+import { client, extractEmails, extractUsernames } from './main.js';
 
 dotenv.config();
 
-const client = new ApifyClient({
-    token: process.env.APIFY_TOKEN,
-});
+const figureOutPlatform = (url: string) => {
+    const regexMap: { [key: string]: RegExp } = {
+        linktree: /linktr\.ee\/([^/?]+)/,
+        instagram: /instagram\.com\/([^/?]+)/,
+        tiktok: /tiktok\.com\/@([^/?]+)/,
+    };
 
-const extractEmails = (text: string) => {
-    if (!text) return new Set<string>();
-    const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
-    return new Set<string>((text.match(emailRegex) || []).map(email => email.trim()));
+    const platform = Object.keys(regexMap).find(key => regexMap[key].test(url));
+    return platform || null;
 }
 
 const extractProfileData = async (page: any) => {
@@ -60,30 +61,6 @@ const separateLinks = (combinedLinks: any[]) => {
     const uniqueOtherLinks = Array.from(new Set(otherLinks.map(link => JSON.stringify(link)))).map(link => JSON.parse(link));
 
     return { uniqueSocialLinks, uniqueOtherLinks };
-};
-
-const extractUsernames = (uniqueSocialLinks: any[], platform: string) => {
-    const regexMap: { [key: string]: RegExp } = {
-        instagram: /instagram\.com\/([^/?]+)/,
-        tiktok: /tiktok\.com\/@([^/?]+)/,
-        twitter: /twitter\.com\/([^/?]+)/,
-        youtube: /youtube\.com\/([^/?]+)/,
-        twitch: /twitch\.tv\/([^/?]+)/,
-        snapchat: /snapchat\.com\/add\/([^/?]+)/
-    };
-
-    const extractUsername = (url: string) => {
-        const match = url.match(regexMap[platform]);
-        return match ? match[1] : null;
-    };
-
-    return uniqueSocialLinks.reduce((usernames, link) => {
-        const username = link && link.url ? extractUsername(link.url) : null;
-        if (username) {
-            usernames.push(username);
-        }
-        return usernames;
-    }, [] as string[]);
 };
 
 const sanitizeText = (text: string | null | undefined): string => {
@@ -159,6 +136,13 @@ const expandYouTubeShortLink = async (shortUrl: string) => {
 export const router = createPlaywrightRouter();
 
 router.addDefaultHandler(async ({ request, page, log }) => {
+    const { url } = request;
+    
+    const platform = figureOutPlatform(url);
+    if (platform === 'instagram' || platform === 'tiktok' || !platform) {
+        return;
+    }
+
     const { pageTitle, profileName, socialIcons, links, emailsFromContent } = await extractProfileData(page);
 
     const emails: Set<string> = new Set(emailsFromContent);
