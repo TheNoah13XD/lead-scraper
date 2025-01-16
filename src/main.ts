@@ -1,4 +1,4 @@
-import { Actor, ApifyClient, Dataset } from 'apify';
+import { Actor, ApifyClient, Dataset, RequestQueue } from 'apify';
 import { PlaywrightCrawler } from 'crawlee';
 import { router } from './routes.js';
 
@@ -43,12 +43,19 @@ export const extractEmails = (text: string) => {
     return new Set<string>((text.match(emailRegex) || []).map(email => email.trim()));
 }
 
+const extractLinktree = (text: string) => {
+    if (!text) return new Set<string>();
+    const linktreeRegex = /https?:\/\/(www\.)?linktr\.ee\/([^/?#]+)/g;
+    return new Set<string>((text.match(linktreeRegex) || []).map(link => link.trim()));
+}
+
 const {
     startUrls = ['https://linktr.ee/whonoahexe'],
     maxRequestsPerCrawl = 100,
 } = await Actor.getInput<Input>() ?? {} as Input;
 
 const proxyConfiguration = await Actor.createProxyConfiguration();
+const requestQueue = await RequestQueue.open();
 
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
@@ -56,7 +63,7 @@ const crawler = new PlaywrightCrawler({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
     },
     maxRequestsPerCrawl,
-    preNavigationHooks: [async ({ request, log }) => {
+    preNavigationHooks: [async ({ request, log, page }) => {
         if (request.url.includes('instagram.com') || request.url.includes('tiktok.com')) {
             const url = request.url;
             const platform = request.url.includes('instagram.com') ? 'instagram' : 'tiktok';
@@ -71,17 +78,25 @@ const crawler = new PlaywrightCrawler({
             const { items } = await client.dataset(run.defaultDatasetId).listItems();
             items.forEach(async (item) => {
                 const bio = platform === 'instagram' ? item.biography : (item as any).authorMeta.signature;
-                const email = Array.from(extractEmails(bio as string)).find(email => email.includes('@'));
-                if (email) {
-                    log.info(`Email found: ${email}`);
-                    await Dataset.pushData({ email, platform, username });
+
+                const linktree = extractLinktree(bio as string);
+                if (linktree.size) {
+                    const linktreeUrl = Array.from(linktree)[0];
+                    log.info(`Linktree found: ${linktreeUrl}`);
+                    await requestQueue.addRequest({ url: linktreeUrl });
+                } else {
+                    const email = Array.from(extractEmails(bio as string)).find(email => email.includes('@'));
+                    if (email) {
+                        log.info(`Email found: ${email}`);
+                        await Dataset.pushData({ email, platform, username });
+                    }
                 }
             });
         }
     }],
     requestHandler: router,
     requestHandlerTimeoutSecs: 1800,
-    maxRequestRetries: 5,
+    maxRequestRetries: 0,
     headless: true,
     minConcurrency: 3,
 });
