@@ -63,7 +63,7 @@ const crawler = new PlaywrightCrawler({
         userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
     },
     maxRequestsPerCrawl,
-    preNavigationHooks: [async ({ request, log, page }) => {
+    preNavigationHooks: [async ({ request, log }) => {
         if (request.url.includes('instagram.com') || request.url.includes('tiktok.com')) {
             const url = request.url;
             const platform = request.url.includes('instagram.com') ? 'instagram' : 'tiktok';
