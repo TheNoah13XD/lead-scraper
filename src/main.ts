@@ -78,8 +78,9 @@ const crawler = new PlaywrightCrawler({
             const { items } = await client.dataset(run.defaultDatasetId).listItems();
             items.forEach(async (item) => {
                 const bio = platform === 'instagram' ? item.biography : (item as any).authorMeta.signature;
+                const externalUrl = platform === 'instagram' ? item.externalUrl : (item as any).authorMeta.bioLink;
 
-                const linktree = extractLinktree(bio as string);
+                const linktree = new Set([...extractLinktree(bio as string), ...extractLinktree(externalUrl as string)]);
                 if (linktree.size) {
                     const linktreeUrl = Array.from(linktree)[0];
                     log.info(`Linktree found: ${linktreeUrl}`);
@@ -96,7 +97,7 @@ const crawler = new PlaywrightCrawler({
     }],
     requestHandler: router,
     requestHandlerTimeoutSecs: 1800,
-    maxRequestRetries: 0,
+    maxRequestRetries: 1,
     headless: true,
     minConcurrency: 3,
 });
