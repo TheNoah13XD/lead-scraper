@@ -88,7 +88,7 @@ const fetchSocialMediaData = async (platform: string, input: any) => {
         return items;
     } catch (error) {
         console.error(`Failed to fetch data for platform ${platform}:`, error);
-        throw new Error(`Failed to fetch data for platform ${platform}`);
+        return [];
     }
 };
 
